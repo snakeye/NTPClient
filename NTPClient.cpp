@@ -69,9 +69,9 @@ void NTPClient::startAsyncUpdate(bool force) {
   if (this->isUpdating())
     return;
 
-  // Update after _updateInterval
+  // Update after _updateInterval, if no update or if forced update
   if ((millis() - this->_lastUpdate >= this->_updateInterval) ||
-      this->_lastUpdate == 0 || force) { // Update if there was no update yet.
+      this->_lastUpdate == 0 || force) {
 
     if (!this->_udpSetup)
       this->begin(); // setup the UDP client if needed

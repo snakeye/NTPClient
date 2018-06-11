@@ -38,9 +38,15 @@ void setup(){
 }
 
 void loop() {
-  timeClient.update();
+  timeClient.startAsyncUpdate();
+  timeClient.processAsyncUpdate();
 
-  Serial.println(timeClient.getFormattedTime());
+  if (timeClient.getLastUpdate() != 0) {
+    Serial.println(timeClient.getFormattedTime());
+  }
+  else {
+    Serial.println("Waiting for update");
+  }
 
   delay(1000);
 }
