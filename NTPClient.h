@@ -63,17 +63,12 @@ public:
    *
    * @return true on success, false on failure
    */
-  void startAsyncUpdate(bool force = false);
+  void asyncUpdate(bool force = false);
 
   /**
    * @return true if currently updating
    */
   bool isUpdating();
-
-  /**
-   * Process async update
-   */
-  bool processAsyncUpdate();
 
   /**
    * Get last update timestamp
@@ -125,5 +120,10 @@ public:
   void end();
 
 private:
+  /**
+   * Process async update
+   */
+  bool processAsyncUpdate();
+
   void sendNTPPacket();
 };

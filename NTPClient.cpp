@@ -64,10 +64,12 @@ void NTPClient::begin(int port) {
   this->_udpSetup = true;
 }
 
-void NTPClient::startAsyncUpdate(bool force) {
+void NTPClient::asyncUpdate(bool force) {
   // skip if already waiting for update
-  if (this->isUpdating())
+  if (this->isUpdating()) {
+    this->processAsyncUpdate();
     return;
+  }
 
   // Update after _updateInterval, if no update or if forced update
   if ((millis() - this->_lastUpdate >= this->_updateInterval) ||

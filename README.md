@@ -38,8 +38,7 @@ void setup(){
 }
 
 void loop() {
-  timeClient.startAsyncUpdate();
-  timeClient.processAsyncUpdate();
+  timeClient.asyncUpdate();
 
   if (timeClient.getLastUpdate() != 0) {
     Serial.println(timeClient.getFormattedTime());
