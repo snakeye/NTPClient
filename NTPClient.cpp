@@ -20,43 +20,29 @@
 
 #include "NTPClient.h"
 
-NTPClient::NTPClient(UDP &udp) { this->_udp = &udp; }
+#define SEVENZYYEARS 2208988800UL
 
-NTPClient::NTPClient(UDP &udp, int timeOffset) {
-  this->_udp = &udp;
-  this->_timeOffset = timeOffset;
-}
+namespace NTPClient {
+Client::Client(UDP &udp) { this->_udp = &udp; }
 
-NTPClient::NTPClient(UDP &udp, const char *poolServerName) {
+Client::Client(UDP &udp, const char *poolServerName) {
   this->_udp = &udp;
   this->_poolServerName = poolServerName;
 }
 
-NTPClient::NTPClient(UDP &udp, const char *poolServerName, int timeOffset) {
+Client::Client(UDP &udp, const char *poolServerName, int updateInterval) {
   this->_udp = &udp;
-  this->_timeOffset = timeOffset;
-  this->_poolServerName = poolServerName;
-}
-
-NTPClient::NTPClient(UDP &udp, const char *poolServerName, int timeOffset,
-                     int updateInterval) {
-  this->_udp = &udp;
-  this->_timeOffset = timeOffset;
   this->_poolServerName = poolServerName;
   this->_updateInterval = updateInterval;
 }
 
-void NTPClient::setTimeOffset(int timeOffset) {
-  this->_timeOffset = timeOffset;
-}
-
-void NTPClient::setUpdateInterval(int updateInterval) {
+void Client::setUpdateInterval(int updateInterval) {
   this->_updateInterval = updateInterval;
 }
 
-void NTPClient::begin() { this->begin(NTP_DEFAULT_LOCAL_PORT); }
+void Client::begin() { this->begin(Client::defaultLocalPort); }
 
-void NTPClient::begin(int port) {
+void Client::begin(int port) {
   this->_port = port;
 
   this->_udp->begin(this->_port);
@@ -64,7 +50,7 @@ void NTPClient::begin(int port) {
   this->_udpSetup = true;
 }
 
-void NTPClient::asyncUpdate(bool force) {
+void Client::asyncUpdate(bool force) {
   // skip if already waiting for update
   if (this->isUpdating()) {
     this->processAsyncUpdate();
@@ -78,8 +64,8 @@ void NTPClient::asyncUpdate(bool force) {
     if (!this->_udpSetup)
       this->begin(); // setup the UDP client if needed
 
-#ifdef DEBUG_NTPClient
-    Serial.println("NTPClient: Update requested");
+#ifdef DEBUG_Client
+    Serial.println("Client: Update requested");
 #endif
 
     this->sendNTPPacket();
@@ -88,9 +74,12 @@ void NTPClient::asyncUpdate(bool force) {
   }
 }
 
-bool NTPClient::isUpdating() { return this->_updateStart != 0; }
+bool Client::isUpdating() { return this->_updateStart != 0; }
 
-bool NTPClient::processAsyncUpdate() {
+/**
+ * Process asynchronous update. Call this function from the loop()
+ */
+bool Client::processAsyncUpdate() {
   // if not waiting for update - skip
   if (!this->isUpdating()) {
     return false;
@@ -99,8 +88,8 @@ bool NTPClient::processAsyncUpdate() {
   // check for timeout
   int waitTime = millis() - this->_updateStart;
   if (waitTime > this->_timeout) {
-#ifdef DEBUG_NTPClient
-    Serial.println("NTPClient: timeout");
+#ifdef DEBUG_Client
+    Serial.println("Client: timeout");
 #endif
     // timeout, cancel current update
     this->_updateStart = 0;
@@ -114,7 +103,7 @@ bool NTPClient::processAsyncUpdate() {
   }
 
   //
-  this->_udp->read(this->_packetBuffer, NTP_PACKET_SIZE);
+  this->_udp->read(this->_packetBuffer, Client::packetSize);
 
   unsigned long highWord =
       word(this->_packetBuffer[40], this->_packetBuffer[41]);
@@ -130,62 +119,40 @@ bool NTPClient::processAsyncUpdate() {
   this->_updateStart = 0;
   this->_currentEpoc = secsSince1900 - SEVENZYYEARS;
 
-#ifdef DEBUG_NTPClient
-  Serial.println("NTPClient: Update received:");
+#ifdef DEBUG_Client
+  Serial.println("Client: Update received:");
   String formattedTime = this->getFormattedTime();
-  Serial.println(String("NTPClient: ") + formattedTime);
+  Serial.println(String("Client: ") + formattedTime);
 #endif
 
   return true;
 }
 
-unsigned long NTPClient::getEpochTime() {
-  return this->_timeOffset +  // User offset
-         this->_currentEpoc + // Epoc returned by the NTP server
+unsigned long Client::getEpochTime() {
+  return this->_currentEpoc + // Epoc returned by the NTP server
          ((millis() - this->_lastUpdate) / 1000); // Time since last update
 }
 
-int NTPClient::getDay() {
+int Client::getDay() {
   return (((this->getEpochTime() / 86400L) + 4) % 7); // 0 is Sunday
 }
 
-int NTPClient::getHours() { return ((this->getEpochTime() % 86400L) / 3600); }
+int Client::getHours() { return ((this->getEpochTime() % 86400L) / 3600); }
 
-int NTPClient::getMinutes() { return ((this->getEpochTime() % 3600) / 60); }
+int Client::getMinutes() { return ((this->getEpochTime() % 3600) / 60); }
 
-int NTPClient::getSeconds() { return (this->getEpochTime() % 60); }
+int Client::getSeconds() { return (this->getEpochTime() % 60); }
 
-/**
- *
- */
-String NTPClient::getFormattedTime(NTPClient::TimeFormat mode) {
-  unsigned long rawTime = this->getEpochTime();
-
-  unsigned long hours = (rawTime % 86400L) / 3600;
-  String hoursStr = hours < 10 ? "0" + String(hours) : String(hours);
-
-  unsigned long minutes = (rawTime % 3600) / 60;
-  String minuteStr = minutes < 10 ? "0" + String(minutes) : String(minutes);
-
-  if (mode == TimeFormat::TimeFormatLong) {
-    unsigned long seconds = rawTime % 60;
-    String secondStr = seconds < 10 ? "0" + String(seconds) : String(seconds);
-
-    return hoursStr + ":" + minuteStr + ":" + secondStr;
-  } else {
-    return hoursStr + ":" + minuteStr;
-  }
-}
-
-void NTPClient::end() {
+void Client::end() {
   this->_udp->stop();
 
   this->_udpSetup = false;
 }
 
-void NTPClient::sendNTPPacket() {
+void Client::sendNTPPacket() {
   // set all bytes in the buffer to 0
-  memset(this->_packetBuffer, 0, NTP_PACKET_SIZE);
+  memset(this->_packetBuffer, 0, Client::packetSize);
+
   // Initialize values needed to form NTP request
   // (see URL above for details on the packets)
   this->_packetBuffer[0] = 0b11100011; // LI, Version, Mode
@@ -200,10 +167,25 @@ void NTPClient::sendNTPPacket() {
 
   // all NTP fields have been given values, now
   // you can send a packet requesting a timestamp:
-  this->_udp->beginPacket(this->_poolServerName,
-                          123); // NTP requests are to port 123
-  this->_udp->write(this->_packetBuffer, NTP_PACKET_SIZE);
+  // NTP requests are to port 123
+  this->_udp->beginPacket(this->_poolServerName, 123);
+  this->_udp->write(this->_packetBuffer, Client::packetSize);
   this->_udp->endPacket();
 }
 
-unsigned long NTPClient::getLastUpdate() { return this->_lastUpdate; }
+unsigned long Client::getLastUpdate() { return this->_lastUpdate; }
+
+/**
+ *
+ */
+String TimeFormatter::getShortTime(unsigned long epochTime) {
+  unsigned long hours = (epochTime % 86400L) / 3600;
+  String hoursStr = hours < 10 ? "0" + String(hours) : String(hours);
+
+  unsigned long minutes = (epochTime % 3600) / 60;
+  String minuteStr = minutes < 10 ? "0" + String(minutes) : String(minutes);
+
+  return hoursStr + ":" + minuteStr;
+}
+
+} // namespace NTPClient

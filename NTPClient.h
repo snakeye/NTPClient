@@ -6,45 +6,36 @@
 
 #include <Udp.h>
 
-#define SEVENZYYEARS 2208988800UL
-#define NTP_PACKET_SIZE 48
-#define NTP_DEFAULT_LOCAL_PORT 1337
+namespace NTPClient {
 
-class NTPClient {
-private:
+class Client {
+
+public:
   const char *_poolServerName = "pool.ntp.org"; // Default time server
 
+private:
+  //
+  static const int packetSize = 48;
+  static const int defaultLocalPort = 137;
+
+  // networking
   UDP *_udp = NULL;
   bool _udpSetup = false;
+  int _port = defaultLocalPort;
+  byte _packetBuffer[packetSize] = {0};
 
-  int _port = NTP_DEFAULT_LOCAL_PORT;
-
-  int _timeOffset = 0; // In s
-
+  //
   unsigned int _updateInterval = 60000; // In ms
 
-  unsigned long _currentEpoc = 0; // In s
-
   unsigned long _updateStart = 0;
-  unsigned long _lastUpdate = 0; // In ms
-  unsigned long _timeout = 1000; // In ms
-
-  byte _packetBuffer[NTP_PACKET_SIZE] = {0};
-
-public:
-  // time formatting enums
-  enum TimeFormat {
-    TimeFormatShort, // hh:mm
-    TimeFormatLong   // hh:mm:ss
-  };
+  unsigned long _lastUpdate = 0;  // In ms
+  unsigned long _timeout = 1000;  // In ms
+  unsigned long _currentEpoc = 0; // In s, UTC
 
 public:
-  NTPClient(UDP &udp);
-  NTPClient(UDP &udp, int timeOffset);
-  NTPClient(UDP &udp, const char *poolServerName);
-  NTPClient(UDP &udp, const char *poolServerName, int timeOffset);
-  NTPClient(UDP &udp, const char *poolServerName, int timeOffset,
-            int updateInterval);
+  Client(UDP &udp);
+  Client(UDP &udp, const char *poolServerName);
+  Client(UDP &udp, const char *poolServerName, int updateInterval);
 
   /**
    * Starts the underlying UDP client with the default local port
@@ -55,6 +46,11 @@ public:
    * Starts the underlying UDP client with the specified local port
    */
   void begin(int port);
+
+  /**
+   * Stops the underlying UDP client
+   */
+  void end();
 
   /**
    * This should be called in the main loop of your application. By default an
@@ -78,25 +74,6 @@ public:
   unsigned long getLastUpdate();
 
   /**
-   * This will force the update from the NTP Server.
-   *
-   * @return true on success, false on failure
-   */
-  // bool forceUpdate();
-
-  int getDay();
-  int getHours();
-  int getMinutes();
-  int getSeconds();
-
-  /**
-   * Changes the time offset. Useful for changing timezones dynamically
-   *
-   * @param timeOffset offset in seconds
-   */
-  void setTimeOffset(int timeOffset);
-
-  /**
    * Set the update interval to another frequency. E.g. useful when the
    * timeOffset should not be set in the constructor
    *
@@ -105,25 +82,26 @@ public:
   void setUpdateInterval(int updateInterval);
 
   /**
-   * @return time formatted like `hh:mm:ss` or `hh:mm`
-   */
-  String getFormattedTime(TimeFormat mode = TimeFormat::TimeFormatLong);
-
-  /**
    * @return time in seconds since Jan. 1, 1970
    */
   unsigned long getEpochTime();
 
-  /**
-   * Stops the underlying UDP client
-   */
-  void end();
+  int getDay();
+  int getHours();
+  int getMinutes();
+  int getSeconds();
 
 private:
-  /**
-   * Process async update
-   */
   bool processAsyncUpdate();
-
   void sendNTPPacket();
 };
+
+class TimeFormatter {
+public:
+  /**
+   * @return time formatted `hh:mm`
+   */
+  static String getShortTime(unsigned long time);
+};
+
+} // namespace NTPClient
