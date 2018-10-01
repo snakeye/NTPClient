@@ -20,6 +20,8 @@
 
 #include "NTPClient.h"
 
+#define DEBUG_Client 1
+
 #define SEVENZYYEARS 2208988800UL
 
 namespace NTPClient {
@@ -42,12 +44,16 @@ void Client::setUpdateInterval(int updateInterval) {
 
 void Client::begin() { this->begin(Client::defaultLocalPort); }
 
-void Client::begin(int port) {
+void Client::begin(unsigned short port) {
   this->_port = port;
 
   this->_udp->begin(this->_port);
 
   this->_udpSetup = true;
+
+  #ifdef DEBUG_Client
+      Serial.println("Client: Started on port" + String(this->_port));
+  #endif
 }
 
 void Client::asyncUpdate(bool force) {
@@ -92,6 +98,7 @@ bool Client::processAsyncUpdate() {
     Serial.println("Client: timeout");
 #endif
     // timeout, cancel current update
+    this->_lastUpdate = this->_updateStart;
     this->_updateStart = 0;
     return false;
   }
@@ -121,8 +128,7 @@ bool Client::processAsyncUpdate() {
 
 #ifdef DEBUG_Client
   Serial.println("Client: Update received:");
-  String formattedTime = this->getFormattedTime();
-  Serial.println(String("Client: ") + formattedTime);
+  Serial.println(String("Client: ") + this->_currentEpoc);
 #endif
 
   return true;

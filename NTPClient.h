@@ -15,13 +15,13 @@ public:
 
 private:
   //
-  static const int packetSize = 48;
-  static const int defaultLocalPort = 137;
+  static const unsigned int packetSize = 48;
+  static const unsigned short defaultLocalPort = 137;
 
   // networking
   UDP *_udp = NULL;
   bool _udpSetup = false;
-  int _port = defaultLocalPort;
+  unsigned short _port = defaultLocalPort;
   byte _packetBuffer[packetSize] = {0};
 
   //
@@ -45,7 +45,7 @@ public:
   /**
    * Starts the underlying UDP client with the specified local port
    */
-  void begin(int port);
+  void begin(unsigned short port);
 
   /**
    * Stops the underlying UDP client
